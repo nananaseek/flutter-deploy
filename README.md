@@ -1,13 +1,14 @@
 # Mednean Flutter Web deployment
 
-This folder is the server-side deployment project. It runs an Nginx static-file server behind `nginxproxy/nginx-proxy` and `nginxproxy/acme-companion` for HTTPS certificates. Flutter Web is built by the main application/CI and copied into `web/`; it is not built in this Compose project.
+This repository is the server-side deployment project. It runs an Nginx static-file server behind `nginxproxy/nginx-proxy` and `nginxproxy/acme-companion` for HTTPS certificates. Flutter Web is built by the main application/CI and copied into `web/`; it is not built in this Compose project.
 
 ## First setup
 
-1. Copy `.env.example` to `.env` and set `DOMAIN` and `LETSENCRYPT_EMAIL` to the production hostname and certificate contact. The included defaults were copied from `rust-flutter-server`; verify them before production.
-2. Make sure the domain's public DNS A/AAAA records point to this server and inbound TCP ports 80 and 443 are reachable. If the server should not serve IPv6, disable `ENABLE_IPV6` in `docker-compose.yml` and ensure no stale AAAA record remains.
-3. Build the Flutter web release in the main project and publish all contents of `build/web/` into this directory's `web/`. A valid `web/index.html` must exist before starting the site.
-4. Run `docker compose config -q` and then `docker compose up -d`. Check `docker compose ps` and `docker compose logs -f nginx-proxy acme-companion web`.
+1. Clone this repository onto the server, e.g. `git clone https://github.com/nananaseek/flutter-deploy.git "$DEPLOY_PATH"`.
+2. Copy `.env.example` to `.env` and set `DOMAIN` and `LETSENCRYPT_EMAIL` to the production hostname and certificate contact. The included defaults were copied from `rust-flutter-server`; verify them before production.
+3. Make sure the domain's public DNS A/AAAA records point to this server and inbound TCP ports 80 and 443 are reachable. If the server should not serve IPv6, disable `ENABLE_IPV6` in `docker-compose.yml` and ensure no stale AAAA record remains.
+4. Build the Flutter web release in the main project and publish all contents of `build/web/` into this directory's `web/`. A valid `web/index.html` must exist before starting the site.
+5. Run `docker compose config -q` and then `docker compose up -d`. Check `docker compose ps` and `docker compose logs -f nginx-proxy acme-companion web`.
 
 The `vhost.d` file is named for the default hostname. If `DOMAIN` changes, rename `vhost.d/app.hideinbasement.xyz` to `vhost.d/<DOMAIN>` and update the app/API origins in its CSP and Permissions-Policy. The Rust server's CORS policy was intentionally not copied: static files are same-origin, while cross-origin API responses must be allowed by the API server itself. Keep the policy in step with LiqPay, Apple Pay, Google Fonts/CanvasKit, and API integrations in the Flutter app. The CSP/security configuration was carried over from `rust-flutter-server`'s Rust middleware and Nginx vhost; Apple Pay authorization still depends on the payment integration, domain verification, HTTPS, and browser/device support as well as these headers.
 
@@ -31,7 +32,7 @@ The Nginx config sends `no-cache, no-store, must-revalidate` for the app entrypo
 
 ## GitHub Actions CI/CD
 
-The main repository workflow is [`.github/workflows/deploy-web.yml`](../.github/workflows/deploy-web.yml). A push to `main` runs Flutter tests and builds the release; a manual `workflow_dispatch` run is also available. It uploads into a per-commit staging directory over SSH, swaps the complete `web/` release, recreates the web container, waits for its health check, and restores the previous release if activation fails. A concurrency group prevents two production deployments from swapping files simultaneously.
+The main repository workflow is [`deploy-web.yml`](https://github.com/HideAndFish/MedneanFront/blob/main/.github/workflows/deploy-web.yml). A push to `main` runs Flutter tests and builds the release; a manual `workflow_dispatch` run is also available. It uploads into a per-commit staging directory over SSH, swaps the complete `web/` release, recreates the web container, waits for its health check, and restores the previous release if activation fails. A concurrency group prevents two production deployments from swapping files simultaneously.
 
 Configure these GitHub Actions repository **Secrets** before enabling deployment:
 
@@ -50,7 +51,7 @@ Configure these Actions repository **Variables**:
 | `DEPLOY_PORT` | Optional SSH port; defaults to `22` |
 | `API_BASE_URL` | Optional API URL embedded from `.env` during build; defaults to `https://api.hideinbasement.xyz:8078` |
 
-Prepare the server once: install Docker Engine + Compose plugin; copy this `deploy/` project to the path in `DEPLOY_PATH`; create its `.env` from `.env.example`; confirm the SSH user can run Docker without an interactive password prompt and has write permission to the project directory. Start the stack once after DNS/ports are ready (`docker compose up -d`) so proxy and ACME are initialized. The workflow does not copy or replace server secrets/certificates.
+Prepare the server once: install Docker Engine + Compose plugin; clone this repository to the path in `DEPLOY_PATH`; create its `.env` from `.env.example`; confirm the SSH user can run Docker without an interactive password prompt and has write permission to the project directory. Start the stack once after DNS/ports are ready (`docker compose up -d`) so proxy and ACME are initialized. The workflow does not copy or replace server secrets/certificates.
 
 `rsync` on the server is optional: the workflow probes for it over SSH and falls back to `scp` when it is missing. Because `scp` has no `--delete`, the staging directory is recreated before every upload in both modes, so switching transports never leaves stale files behind.
 

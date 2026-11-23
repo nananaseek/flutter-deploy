@@ -2,5 +2,7 @@
 /certs/
 /dhparam/
 /html/
+/.incoming/
+/.web-previous-*/
 /web/*
 !/web/.gitkeep
