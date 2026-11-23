@@ -1,0 +1,31 @@
+# Compression (TLS edge proxy only; the static nginx container does not gzip).
+gzip on;
+gzip_comp_level 6;
+gzip_vary on;
+gzip_types
+  text/plain
+  text/css
+  application/javascript
+  application/json
+  application/xml
+  application/octet-stream
+  image/svg+xml
+  application/wasm;
+
+# Security headers carried over from rust-flutter-server's Rust middleware and vhost.
+# HSTS is only safe while this hostname is HTTPS-only.
+add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header X-XSS-Protection "1; mode=block" always;
+add_header Referrer-Policy "no-referrer" always;
+
+# LiqPay / Apple Pay browser capabilities, matching the old server policy.
+add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(self \"https://www.liqpay.ua\"), gyroscope=(), magnetometer=(), microphone=(), payment=(self \"https://www.liqpay.ua\"), usb=()" always;
+
+# CSP carried over from rust-flutter-server/src/main.rs. Keep the origins in sync
+# with the Flutter app's LiqPay, Apple Pay, API and Google Fonts/CanvasKit usage.
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://static.liqpay.ua https://applepay.cdn-apple.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com https://applepay.cdn-apple.com data:; connect-src 'self' https://app.hideinbasement.xyz https://api.hideinbasement.xyz:8078 https://fonts.gstatic.com https://www.gstatic.com https://www.liqpay.ua https://static.liqpay.ua; media-src 'self'; frame-src https://www.liqpay.ua https://static.liqpay.ua; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" always;
+
+# The web container's Docker healthcheck queries /health directly. Do not
+# override nginx-proxy's generated location here; this virtual host is TLS edge only.

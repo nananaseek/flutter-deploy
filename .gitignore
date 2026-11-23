@@ -1,0 +1,6 @@
+.env
+/certs/
+/dhparam/
+/html/
+/web/*
+!/web/.gitkeep
